@@ -1,0 +1,173 @@
+# NT140 Secure Web Gateway Lab (spec §2). Owner of the shared skeleton: TV1 (INF-2).
+# Each track edits only its own service blocks (plan §2.1).
+name: nt140-swg
+
+x-common: &common
+  environment:
+    TZ: ${TZ:-Asia/Ho_Chi_Minh}
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+  restart: unless-stopped
+
+networks:
+  lan_staff:
+    internal: true
+    ipam: { config: [ { subnet: 10.10.0.0/24 } ] }
+  lan_guest:
+    internal: true
+    ipam: { config: [ { subnet: 10.20.0.0/24 } ] }
+  svc:
+    internal: true
+    ipam: { config: [ { subnet: 10.30.0.0/24 } ] }
+  wan:
+    ipam: { config: [ { subnet: 172.30.0.0/24 } ] }
+
+volumes:
+  squid-cache:
+  squid-ssldb:
+  clamav-db:
+
+services:
+  # --- Track INF/POL (TV1) -------------------------------------------------
+  squid:
+    <<: *common
+    build: docker/squid
+    image: nt140/squid:dev
+    environment:
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+      TLS_MODE: ${TLS_MODE:-selective}
+      WORK_HOURS_MODE: ${WORK_HOURS_MODE:-real}
+      ICAP_BYPASS: ${ICAP_BYPASS:-off}
+      ICAP_ENABLED: ${ICAP_ENABLED:-1}
+      GUEST_RATE_BYTES: ${GUEST_RATE_BYTES:-262144}
+    networks:
+      lan_staff: { ipv4_address: 10.10.0.10 }
+      lan_guest: { ipv4_address: 10.20.0.10 }
+      svc: { ipv4_address: 10.30.0.10 }
+      wan: { ipv4_address: 172.30.0.10 }
+    ports:
+      - "${PUBLISH_ADDR:-127.0.0.1}:3128:3128"
+    volumes:
+      - ./policy:/etc/squid/policy:ro
+      - ./certs:/opt/certs:ro
+      - ./logs/squid:/var/log/squid
+      - squid-cache:/var/spool/squid
+      - squid-ssldb:/var/lib/squid/ssl_db
+    healthcheck:
+      test: ["CMD", "squid", "-k", "check"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    depends_on:
+      testweb: { condition: service_healthy }
+      # THR-4: add `icap: { condition: service_healthy }` when the av profile is removed.
+
+  # --- Track TLS (TV2) -----------------------------------------------------
+  client-staff:
+    <<: *common
+    build: docker/client
+    image: nt140/client:dev
+    environment:
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+      PROXY_URL: http://10.10.0.10:3128
+      MANAGED: "1"
+    networks:
+      lan_staff: { ipv4_address: 10.10.0.101 }
+    volumes:
+      - ./tests/probe:/opt/lab:ro
+      - ./certs:/opt/certs:ro
+      - ./captures:/captures
+
+  client-guest:
+    <<: *common
+    build: docker/client
+    image: nt140/client:dev
+    environment:
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+      PROXY_URL: http://10.20.0.10:3128
+      MANAGED: "0"
+    networks:
+      lan_guest: { ipv4_address: 10.20.0.101 }
+    volumes:
+      - ./tests/probe:/opt/lab:ro
+      - ./certs:/opt/certs:ro
+      - ./captures:/captures
+
+  sniffer: # TLS-6
+    profiles: [capture]
+    image: nicolaka/netshoot:v0.13  # [VERIFY] tag + arm64 before TLS-6
+    network_mode: service:squid
+    volumes:
+      - ./captures:/captures
+    command: ["sleep", "infinity"]
+
+  tcpecho: # TLS-8 (P2)
+    profiles: [p2]
+    image: alpine/socat:1.8.0.0  # [VERIFY] tag + arm64 before TLS-8
+    networks:
+      wan: { aliases: [tcpecho.lab.test] }
+    command: ["TCP-LISTEN:443,fork,reuseaddr", "EXEC:cat"]
+
+  # --- Track THR (TV3) -----------------------------------------------------
+  testweb:
+    <<: *common
+    build: docker/testweb
+    image: nt140/testweb:dev
+    networks:
+      wan:
+        ipv4_address: 172.30.0.50
+        aliases:
+          - allowed.lab.test
+          - social.lab.test
+          - games.lab.test
+          - stream.lab.test
+          - gamble.lab.test
+          - uitbank.lab.test
+          - uitbank-secure-login.lab.test
+          - uitbank-verify-account.lab.test
+          - malware-cdn.lab.test
+          - downloads.lab.test
+          - cache.lab.test
+          - pinned.lab.test
+          - dns.lab.test
+    volumes:
+      - ./certs:/opt/certs:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # THR-4: remove the `av` profile once docker/icap is implemented.
+  icap:
+    <<: *common
+    profiles: [av]
+    build: docker/icap
+    image: nt140/icap:dev
+    networks:
+      svc: { ipv4_address: 10.30.0.20 }
+    depends_on:
+      clamav: { condition: service_healthy }
+
+  clamav:
+    <<: *common
+    profiles: [av]
+    image: clamav/clamav-debian:1.4  # spec §2.1: the Alpine image has no arm64
+    networks:
+      svc: { ipv4_address: 10.30.0.21 }
+      wan: { ipv4_address: 172.30.0.21 }
+    volumes:
+      - clamav-db:/var/lib/clamav
+    # THR-4: add a clamd healthcheck with start_period >= 300s (spec §7).
+
+  goaccess: # THR-7
+    <<: *common
+    profiles: [dashboard]
+    image: allinurl/goaccess:1.9.3  # [VERIFY] tag + arm64 before THR-7
+    networks:
+      wan: { ipv4_address: 172.30.0.60 }
+    ports:
+      - "${PUBLISH_ADDR:-127.0.0.1}:7890:7890"
+    volumes:
+      - ./logs/squid:/var/log/squid:ro

@@ -1,0 +1,17 @@
+# Local state (spec §15)
+.env
+CLAUDE.local.md
+certs/*
+!certs/README.md
+policy/lists/feeds/*
+!policy/lists/feeds/.gitkeep
+policy/generated/
+logs/
+captures/
+results/
+*.pcap
+*.pcapng
+*.keys
+__pycache__/
+*.pyc
+.DS_Store
