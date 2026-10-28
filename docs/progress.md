@@ -5,8 +5,8 @@
 > - **Ghi đè** trạng thái hiện tại, không viết nhật ký. Lịch sử xem bằng `git log`.
 > - Mỗi track chỉ sửa section của mình. Section “Chung” do TV1 cập nhật.
 
-**Milestone hiện tại:** M1 (khung chạy được). Đã kiểm tay xong, còn thiếu test tự động S0 (THR-2).
-**Cập nhật lần cuối:** 2026-10-22, Claude (cùng TV1)
+**Milestone hiện tại:** đang hoàn thiện M1 (khung chạy được). Đã kiểm tay, còn thiếu test tự động phần khung; kiểm tra S0 đầy đủ sau khi triển khai antivirus, trước M2.
+**Cập nhật lần cuối:** 2026-10-28, Codex (làm rõ phân công/lộ trình trong plan; testweb thuộc TV2; kết quả chạy giữ theo lần kiểm 2026-10-22)
 
 ## Chung
 - Môi trường: TV1 dùng Docker Desktop trên Mac M2 (arm64). Kali/UTM chỉ dùng làm máy demo (plan §3).
@@ -27,16 +27,17 @@
 
 ## Track TLS (TV2, amd64)
 - Xong (Claude làm trước để mở khóa M1): TLS-1 `scripts/gen-certs.sh` (idempotent, `--force`, tương thích LibreSSL). Image client cài CA theo `MANAGED`.
+- Xong một phần TLS-9 (Claude): testweb có `/`, `/upload`, `/dns-query`, `/cacheable/<any>/{1m,2m,10m}.bin`, `/nocache/1m.bin`, TLS 443, đủ alias `*.lab.test`.
 - Việc của TV2:
+  - Hoàn tất TLS-9 (testweb): `/files/*`, `/dl/*`, `/login`, `/payload.bin` theo spec §8. Có `TODO(TLS-9)` trong `docker/testweb/nginx.conf`.
   - Review TLS-1 trên amd64.
   - TLS-2: `tests/probe/probe.sh` theo hợp đồng JSON spec §9.1. Thư mục mới chỉ có trong mount, chưa có file.
   - TLS-3: SslBump. Tạo `docker/squid/templates/sslbump-{splice,bump,selective}.conf.tmpl`; entrypoint tự dùng template theo `TLS_MODE`, nếu thiếu thì dùng placeholder.
 - Blocker: —
 
 ## Track THR (TV3, amd64)
-- Xong một phần THR-1 (Claude): testweb có `/`, `/upload`, `/dns-query`, `/cacheable/<any>/{1m,2m,10m}.bin`, `/nocache/1m.bin`, TLS 443, đủ alias `*.lab.test`.
+- Testweb do TV2 phụ trách (TLS-9); TV3 kiểm tra dữ liệu thử phục vụ antivirus/phishing và viết test THR.
 - Việc của TV3:
-  - Hoàn tất THR-1: `/files/*`, `/dl/*`, `/login`, `/payload.bin` theo spec §8. Có `TODO(THR-1)` trong `docker/testweb/nginx.conf`.
   - THR-3: logformat `lab` trong `conf.d/60-logging.conf` (hiện chỉ có `access.log` dạng squid).
   - THR-2: `tests/run_all.py` + `s00_smoke.py`.
   - THR-4: bỏ profile `av`, viết `docker/icap`. Image ClamAV là `clamav/clamav-debian:1.4`.

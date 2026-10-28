@@ -109,7 +109,7 @@ services:
       wan: { aliases: [tcpecho.lab.test] }
     command: ["TCP-LISTEN:443,fork,reuseaddr", "EXEC:cat"]
 
-  # --- Track THR (TV3) -----------------------------------------------------
+  # --- Track TLS (TV2): testweb (TLS-9) ------------------------------------
   testweb:
     <<: *common
     build: docker/testweb
@@ -139,6 +139,7 @@ services:
       timeout: 3s
       retries: 10
 
+  # --- Track THR (TV3) -----------------------------------------------------
   # THR-4: remove the `av` profile once docker/icap is implemented.
   icap:
     <<: *common

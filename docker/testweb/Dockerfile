@@ -1,4 +1,4 @@
-# Simulated Internet for the lab (spec §8). Owner: THR-1.
+# Simulated Internet for the lab (spec §8). Owner: TV2 (TLS-9).
 FROM nginx:1.27-alpine
 RUN rm -f /etc/nginx/conf.d/default.conf
 COPY nginx.conf /etc/nginx/conf.d/nt140.conf
