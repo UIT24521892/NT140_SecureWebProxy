@@ -25,6 +25,29 @@ CONFD=/etc/squid/conf.d
 # ./policy is mounted read-only; generated files come from `make init` (spec §5.5).
 [ -f "$POLICY/generated/work_hours.conf" ] || die "missing $POLICY/generated/work_hours.conf, run 'make init' on the host"
 
+# Basic auth: htpasswd and group files from users.lab, generated inside the container (spec §4).
+USERS_SRC="$POLICY/auth/users.lab"
+AUTH_DIR=/etc/squid/auth
+[ -f "$USERS_SRC" ] || die "missing $USERS_SRC"
+mkdir -p "$AUTH_DIR"
+: > "$AUTH_DIR/users.htpasswd"
+: > "$AUTH_DIR/group_admin.txt"
+: > "$AUTH_DIR/group_staff.txt"
+while IFS=: read -r user pass group; do
+  case "$user" in ''|'#'*) continue ;; esac
+  [ -n "$pass" ] || die "users.lab: empty password for '$user'"
+  case "$group" in
+    admin|staff) echo "$user" >> "$AUTH_DIR/group_$group.txt" ;;
+    *) die "users.lab: unknown group '$group' for '$user'" ;;
+  esac
+  htpasswd -b -m "$AUTH_DIR/users.htpasswd" "$user" "$pass" 2>/dev/null
+done < "$USERS_SRC"
+[ -s "$AUTH_DIR/users.htpasswd" ] || die "no users in $USERS_SRC"
+chown -R root:proxy "$AUTH_DIR"
+chmod 750 "$AUTH_DIR"
+chmod 640 "$AUTH_DIR"/*
+log "auth: $(wc -l < "$AUTH_DIR/users.htpasswd") users, admin=$(wc -l < "$AUTH_DIR/group_admin.txt") staff=$(wc -l < "$AUTH_DIR/group_staff.txt")"
+
 # Lab public CA: lets squid verify testweb when bumping (spec §3).
 if [ -f /opt/certs/lab-public-ca.crt ]; then
   cp /opt/certs/lab-public-ca.crt /usr/local/share/ca-certificates/nt140-lab-public-ca.crt

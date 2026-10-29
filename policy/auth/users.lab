@@ -1,0 +1,5 @@
+# Lab accounts (spec §4). Format: user:password:group (group = staff|admin).
+# Lab-only passwords; the squid entrypoint turns this into htpasswd + group files.
+alice:alice123:staff
+bob:bob123:staff
+admin1:admin123:admin

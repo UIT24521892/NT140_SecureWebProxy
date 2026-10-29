@@ -21,8 +21,11 @@
 
 ## Track INF/POL (TV1, arm64)
 - Xong: INF-1, INF-2, INF-3 (Squid 6.14 `squid-openssl`, render template, `-k parse` lúc start, healthcheck `squid -k check`).
-- `40-access.conf` đang ở dạng khung (cho phép cả 2 LAN), chưa có auth.
-- Bước tiếp: POL-1 (auth) → POL-2 (list + ACL) → POL-3 (`http_access` §5.4, trang chặn) → POL-4.
+- POL-1 (nhánh `pol/POL-1-auth`, chưa commit): `policy/auth/users.lab`; entrypoint sinh `users.htpasswd` (apr1) và `group_{admin,staff}.txt` trong container; `conf.d/12-acl-auth.conf` (`auth_param`, `authenticated`, `grp_admin`, `grp_staff`).
+- `40-access.conf` vẫn là khung: guest LAN mở, nguồn khác `deny !authenticated` rồi cho phép `grp_admin`/`grp_staff`. Thứ tự đầy đủ để POL-3 làm.
+- Kiểm tay arm64 (2026-10-28): staff anon/badpass/user lạ → 407; alice/bob/admin1 → 200; CONNECT anon → 407, alice → 200; guest anon → 200; host 127.0.0.1 anon → 407. `access.log` ghi đúng username. `squid -k parse` sạch, `make lint` ok.
+- Lưu ý cho TLS-2: CONNECT bị 407 thì curl ra `000`/exit 56, probe phải phân loại là `AUTH_REQUIRED`.
+- Bước tiếp: POL-2 (list + ACL) → POL-3 (`http_access` §5.4, trang chặn) → POL-4. Cần người amd64 kiểm POL-1.
 - Blocker: —
 
 ## Track TLS (TV2, amd64)
