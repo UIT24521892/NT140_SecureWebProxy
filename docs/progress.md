@@ -43,7 +43,7 @@
 ## Track THR (TV3, amd64)
 - Testweb do TV2 phụ trách (TLS-9); TV3 kiểm tra dữ liệu thử phục vụ antivirus/phishing và viết test THR.
 - Việc của TV3:
-  - THR-3: logformat `lab` trong `conf.d/60-logging.conf` (hiện chỉ có `access.log` dạng squid).
+  - THR-3 (đang review, nhánh `thr/THR-3-logformat`): logformat `lab` 16 trường TAB → `access_lab.log`; parser `tests/lib/squidlog.py` (`find_by_test_id`, `evidence`, `--check`). Đã kiểm: 16 trường, `py_compile`, parser trên log mẫu. **Chưa** chạy `squid -k parse` / log thật (cần amd64 + arm64). Chưa verify `%adapt::sum_trs`.
   - THR-2: `tests/run_all.py` + `s00_smoke.py`.
   - THR-4: bỏ profile `av`, viết `docker/icap`. Image ClamAV là `clamav/clamav-debian:1.4`.
 - Blocker: —
