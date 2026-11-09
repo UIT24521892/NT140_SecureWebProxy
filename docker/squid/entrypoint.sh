@@ -39,12 +39,9 @@ render() {
   log "rendered $(basename "$dst") from $(basename "$src")"
 }
 
-sslbump_tmpl="$TEMPLATES/sslbump-$TLS_MODE.conf.tmpl"
-if [ ! -f "$sslbump_tmpl" ]; then
-  log "no template for TLS_MODE=$TLS_MODE yet (TLS-3), using placeholder"
-  sslbump_tmpl="$TEMPLATES/sslbump-placeholder.conf.tmpl"
-fi
-render "$sslbump_tmpl" "$CONFD/20-sslbump.conf"
+# TLS-3: shared with live mode switching. Keys stay root:proxy 0640.
+[ -f /etc/squid/tls-keylog.conf ] || : > /etc/squid/tls-keylog.conf
+/usr/local/lib/nt140/prepare-tls.sh "$TLS_MODE"
 
 if [ -f "$TEMPLATES/icap.conf.tmpl" ]; then
   render "$TEMPLATES/icap.conf.tmpl" "$CONFD/30-icap.conf"
@@ -62,6 +59,8 @@ mkdir -p /var/log/squid /var/spool/squid /var/lib/squid
 chown -R proxy:proxy /var/log/squid /var/spool/squid /var/lib/squid
 
 # Create cache_dir structure on first start (no-op without cache_dir).
+# A restarted container keeps its old PID file; remove it before any Squid invocation.
+rm -f /run/squid.pid
 squid -z --foreground -f /etc/squid/squid.conf 2>&1 | sed 's/^/squid -z: /' >&2
 
 if ! parse_out=$(squid -k parse -f /etc/squid/squid.conf 2>&1); then
@@ -74,5 +73,4 @@ if printf '%s\n' "$parse_out" | grep -qE 'FATAL|ERROR'; then
 fi
 log "squid -k parse ok"
 
-rm -f /run/squid.pid
 exec squid -N -d 1 -f /etc/squid/squid.conf

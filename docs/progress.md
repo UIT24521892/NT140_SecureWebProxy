@@ -26,14 +26,17 @@
 - Blocker: —
 
 ## Track TLS (TV2, amd64)
-- Xong (Claude làm trước để mở khóa M1): TLS-1 `scripts/gen-certs.sh` (idempotent, `--force`, tương thích LibreSSL). Image client cài CA theo `MANAGED`.
-- Xong một phần TLS-9 (Claude): testweb có `/`, `/upload`, `/dns-query`, `/cacheable/<any>/{1m,2m,10m}.bin`, `/nocache/1m.bin`, TLS 443, đủ alias `*.lab.test`.
-- Việc của TV2:
-  - Hoàn tất TLS-9 (testweb): `/files/*`, `/dl/*`, `/login`, `/payload.bin` theo spec §8. Có `TODO(TLS-9)` trong `docker/testweb/nginx.conf`.
-  - Review TLS-1 trên amd64.
-  - TLS-2: `tests/probe/probe.sh` theo hợp đồng JSON spec §9.1. Thư mục mới chỉ có trong mount, chưa có file.
-  - TLS-3: SslBump. Tạo `docker/squid/templates/sslbump-{splice,bump,selective}.conf.tmpl`; entrypoint tự dùng template theo `TLS_MODE`, nếu thiếu thì dùng placeholder.
-- Blocker: —
+- Cập nhật 2026-11-07, Codex/TV2, amd64. Đã triển khai mã TLS-1/2/3/4/5/6/7/9, DOC-2; TLS-8 chưa làm (P2).
+- PKI/probe: 9 test đạt (sinh/giữ/xoay CA, phát hiện key lệch, 6 outcome bằng curl thật); testweb: 5 test đạt, đủ alias/path/MIME/archive.
+- Ba mode đổi bằng `scripts/set-tls-mode.sh`, SSL DB/CA được chuẩn bị, parse sạch; staff bump, guest/nobump splice, SNI terminate, pinning/unmanaged đúng.
+- S7/S8/S9: 18/25 đạt; 7 FAIL giữ nguyên expect: T7.1/2, T8.2/7, T9.4/6/7 (thiếu POL-3/5). Xem `results/tls/20261107-203319-616b2e/`.
+- Case hỗ trợ: T6.7 đạt; T1.5/T6.8 chưa đạt do POL-3. Xem `results/tls/20261107-205119-786d79/`.
+- Capture: 4 pcap của 3 loại HTTP/splice/bump (một bump TLS1.2 chẩn đoán); tshark giải mã GET client TLS1.3 và upstream TLS1.2. Chưa có ICAP/ảnh Wireshark.
+- Benchmark: 500 request (50/payload), B1/B2/B5/B6/B7 đạt; B3 SKIP (POL-5), B4/B8 SKIP (THR-4). `results/bench/20261107-204741-89a07c/` có CSV/MD/CPU-RAM.
+- Kiểm tra: build/up trên amd64, Compose config, ShellCheck, py_compile, test thật; `make test P=P0` chưa chạy được vì THR-2 chưa có runner.
+- Bàn giao: `docs/trung-handoff.md`, `tls-limitations.md`, `wireshark.md`. Dùng log TLS + cổng client để nối dòng CONNECT cuối bị mất header test ID.
+- Checklist bàn giao 2026-11-09: [x] nhánh TLS riêng, sửa liên kết; [ ] clone sạch amd64; [ ] push/PR; [ ] ZIP + SHA256SUMS. Số liệu 07/11 giữ nguyên; chạy lại ghi riêng.
+- Còn chờ: POL-2/3/5 + THR-2/4, chạy arm64, ảnh ICAP/Wireshark, review DOC-2. Lab đã phục hồi selective/giờ ban đầu, tắt TLS key log tạm.
 
 ## Track THR (TV3, amd64)
 - Testweb do TV2 phụ trách (TLS-9); TV3 kiểm tra dữ liệu thử phục vụ antivirus/phishing và viết test THR.
