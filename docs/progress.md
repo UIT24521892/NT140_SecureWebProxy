@@ -6,7 +6,7 @@
 > - Mỗi track chỉ sửa section của mình. Section “Chung” do TV1 cập nhật.
 
 **Milestone hiện tại:** đang hoàn thiện M1 (khung chạy được). Đã kiểm tay, còn thiếu test tự động phần khung; kiểm tra S0 đầy đủ sau khi triển khai antivirus, trước M2.
-**Cập nhật lần cuối:** 2026-11-06, TV1 (README có hướng dẫn chạy Docker từ đầu cho 4 môi trường; kiểm lại POL-1 trên lab đang chạy)
+**Cập nhật lần cuối:** 2026-11-09, TV1 (đồng bộ THR-3 từ main, build/up và kiểm lại POL-1 + log thật trên arm64)
 
 ## Chung
 - Môi trường: TV1 dùng Docker Desktop trên Mac M2 (arm64). Kali/UTM chỉ dùng làm máy demo (plan §3).
@@ -18,17 +18,19 @@
   - đi thẳng không qua proxy: curl exit 6/7, client không có default route;
   - `access.log` có các dòng TCP_MISS/200 và TCP_TUNNEL/200.
 - Đã chạy test trên: arm64 ✅ (thủ công), amd64 ❌ (chưa)
+- THR-3 đã merge vào `main` qua PR #2 (07/11) và ghép vào nhánh POL-1. TV1 kiểm trên arm64 (09/11): parse sạch; parser đọc được log thật 16 trường. Mục THR bên dưới giữ thông tin bàn giao của TV3.
 - Profile chưa bật: `av` (icap, clamav, THR-4), `dashboard` (goaccess), `capture` (sniffer), `p2` (tcpecho).
 
 ## Track INF/POL (TV1, arm64)
 - Xong: INF-1, INF-2, INF-3 (Squid 6.14 `squid-openssl`, render template, `-k parse` lúc start, healthcheck `squid -k check`).
 - POL-1 (nhánh `pol/POL-1-auth`, đã commit `62514b4`, chưa merge vào `main`): `policy/auth/users.lab`; entrypoint sinh `users.htpasswd` (apr1) và `group_{admin,staff}.txt` trong container; `conf.d/12-acl-auth.conf` (`auth_param`, `authenticated`, `grp_admin`, `grp_staff`).
 - `40-access.conf` vẫn là khung: guest LAN mở, nguồn khác `deny !authenticated` rồi cho phép `grp_admin`/`grp_staff`. Thứ tự đầy đủ để POL-3 làm.
-- Kiểm tay arm64 (2026-10-28): staff anon/badpass/user lạ → 407; alice/bob/admin1 → 200; CONNECT anon → 407, alice → 200; guest anon → 200; host 127.0.0.1 anon → 407. `access.log` ghi đúng username. `squid -k parse` sạch, `make lint` ok.
+- Kiểm arm64 (2026-11-09): 31/31 kiểm tra độc lập đạt (16 request HTTP/HTTPS, 8 dòng log theo test ID, định dạng log/không lộ mật khẩu, cô lập mạng và origin). Staff anon/badpass/user lạ, host anon → 407; alice/bob/admin1 và guest anon → 200. Bằng chứng: `results/pol1/20261109-arm64/{results.md,results.json,verify.py}` (gitignored).
+- `make init`, `docker compose config --quiet`, `make build`, `make up`, `squid -k parse`, `make lint`, `py_compile` và parser `--check` đạt. `make test S=S1`, `S=S2`, `P=P0` đều dừng do chưa có THR-2; 31 kiểm tra trên không thay thế runner chung.
 - Lưu ý cho TLS-2: CONNECT bị 407 thì curl ra `000`/exit 56, probe phải phân loại là `AUTH_REQUIRED`.
 - Bước tiếp: POL-2 (list + ACL) → POL-3 (`http_access` §5.4, trang chặn) → POL-4. Cần người amd64 kiểm POL-1.
-- Checklist chốt POL-1 (2026-11-09): [ ] đồng bộ THR-3 từ `main`; [ ] build/up, kiểm auth và log thật trên arm64; [ ] commit README/progress và cập nhật PR #1. Chờ amd64 + review trước khi merge.
-- Blocker: —
+- Checklist chốt POL-1: [x] đồng bộ THR-3 từ `main`; [x] build/up, kiểm auth và log thật trên arm64; [x] lưu hướng dẫn README; [ ] nghiệm thu amd64 + review/merge PR #1.
+- Blocker nghiệm thu: thiếu THR-2; cần TV2/TV3 kiểm lại đúng nhánh PR #1 trên amd64 và có người review theo plan §4. Báo cáo amd64 trong handoff TLS chưa xác nhận bản POL-1 đã đồng bộ THR-3 này.
 
 ## Track TLS (TV2, amd64)
 - Xong (Claude làm trước để mở khóa M1): TLS-1 `scripts/gen-certs.sh` (idempotent, `--force`, tương thích LibreSSL). Image client cài CA theo `MANAGED`.
@@ -51,5 +53,6 @@
 ## Kết quả test gần nhất
 | Ngày | Arch | Lệnh | Kết quả |
 |---|---|---|---|
+| 2026-11-09 | arm64 | Init/config/build/up; auth HTTP/HTTPS; log THR-3; cô lập mạng; parse; lint; py_compile | 31/31 kiểm tra độc lập đạt; parser đọc 16 dòng thật, đủ 16 trường. S1/S2/P0 chưa chạy được vì thiếu THR-2 |
 | 2026-11-06 | arm64 | Các lệnh Bước 4 của README trên lab đang chạy; `make init`, `make build` trên bản clone sạch; `make lint` | Đạt (kiểm tay). Chưa chạy lại `make down` + `make up` từ đầu |
 | 2026-10-22 | arm64 | `make up`; curl qua proxy (HTTP/HTTPS); curl direct; `squid -k parse/check/reconfigure`; `make lint` | Tất cả đạt (kiểm tay, chưa có runner) |
