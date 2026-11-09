@@ -94,10 +94,34 @@ SUPPORT ghi riêng: T1.5 expected BLOCK:social, actual ALLOW (POL-2/3); T6.7 ALL
 
 ## Gói bằng chứng riêng
 
+PR bàn giao: [#3 — TLS/DOC-2](https://github.com/UIT24521892/NT140_SecureWebProxy/pull/3). Nhánh `tls/TLS-3-tv2-handoff`; SHA cuối của PR và checksum gói nằm trong README-evidence của ZIP, không tự tham chiếu SHA trong commit tài liệu này.
+
 Push code và mở PR trước khi chốt ZIP. Gói giữ nguyên cây `docs/`, `results/tls/`, `results/bench/`, `captures/` để các liên kết tương đối đọc được sau giải nén. Gửi kèm `README-evidence.md`, `SHA256SUMS` cho mọi file (trừ chính manifest), và checksum `.zip.sha256` bên ngoài ZIP.
 
 README của gói ghi URL PR, full PR-head SHA, SHA của lần chạy clone sạch, môi trường/phiên bản công cụ, thời điểm và lệnh tái lập. Kết quả 07/11 chưa ghi commit SHA khi chạy trên working tree chưa commit; không gán hồi tố chúng cho commit bàn giao. Lần chạy clone sạch trên commit cụ thể bổ sung khả năng đối chiếu. Nếu sau chạy chỉ sửa tài liệu, README phải nêu rõ diff và lý do không cần chạy lại runtime.
 
 Chỉ đưa bốn pcap hiện có cùng các session key log tương ứng của lab, tóm tắt capture và kết quả gốc vào ZIP; không đưa `.env`, thư mục certs, CA/private key, htpasswd hay dữ liệu ngoài phạm vi. Session key log không commit Git. Bốn pcap chỉ có ba loại HTTP/splice/bump; capture TLS1.2 chẩn đoán không thay thế capture ICAP.
+
+## Kiểm tra clone sạch ngày 2026-11-09
+
+Commit runtime: `cbc7cb1f7dc75a5837b5838a87bc95f79c605f52`, clone chỉ từ Git, project `nt140-tls-review` và volume mới. Môi trường amd64: Docker Engine 29.3.1, Squid 6.14, OpenSSL 3.0.13, curl 8.5.0, Python container 3.12.3. Kết quả này bổ sung, không thay dữ liệu 07/11.
+
+| Kiểm tra | Kết quả thật |
+|---|---|
+| Init/build/up, Compose config | Exit 0; tự sinh CA/pin/feed rỗng/work_hours/fixtures |
+| ShellCheck, Python AST/py_compile | Exit 0; 12 shell script và 15 Python file |
+| PKI/probe, testweb | 9/9 và 5/5 đạt |
+| Splice/bump/selective | Hot-switch và `squid -k parse` exit 0 từng mode |
+| [S7/S8/S9](../results/tls/20261109-164039-97a6bb/results.md) | 18/25; cùng 7 FAIL trong bảng trên, exit 1 |
+| [SUPPORT](../results/tls/20261109-164106-e9beb5/results.md) | T6.7 PASS (limitation), T1.5/T6.8 FAIL, exit 1 |
+| [Benchmark](../results/bench/20261109-164146-757587/bench.md) | 500 samples; B1/B2/B5/B6/B7 đạt, B3/B4/B8 SKIP có lý do |
+| Phục hồi state và log | TLS selective, work_hours byte-identical, `.env` không bị runner sửa; parser THR-3 kiểm tra 16 trường thành công |
+| Restart Squid | Restart/up --wait/parse exit 0; HTTPS probe ALLOW, issuer Proxy CA |
+| P0 và runner S7/S8/S9 chung | Exit 2 từ Make: `not implemented yet (THR-2)`; chưa nghiệm thu |
+| Bốn pcap gốc | Offline tshark giải mã GET client TLS1.3 và GET upstream TLS1.2 đúng frame/IP; chưa có ICAP |
+
+Lệnh thật, stdout/stderr, thời điểm chạy, phiên bản và image IDs nằm trong `results/handoff/20261109/` của ZIP. Sau commit runtime chỉ cập nhật tài liệu bàn giao/progress/verify-log; README-evidence liệt kê diff theo full SHA. Không cần chạy lại runtime khi chỉ đổi các tài liệu đó.
+
+Đã sửa entrypoint chung để xóa PID cũ trước `squid -z`, tránh restart loop; cần TV1 review. Trên host dùng Python portable, cấu hình `_pth` từng trỏ về repo cũ đã được loại trước lần chạy hợp lệ; runner được nạp với import path của clone. Lượt chạy sai môi trường không được tính là bằng chứng clone sạch. Không có thay đổi vào expected/scenario/probe schema hoặc parser THR-3.
 
 Cần kiểm tra lại trên **arm64**, review DOC-2, ghép policy/cache/ICAP và runner toàn dự án, tạo capture ICAP và chụp ảnh Wireshark thật trước khi đánh dấu toàn bộ TV2 hoàn thành. TLS-8 chưa triển khai vì phần chính còn phụ thuộc các track khác.

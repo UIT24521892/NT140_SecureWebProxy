@@ -35,7 +35,8 @@
 - Benchmark: 500 request (50/payload), B1/B2/B5/B6/B7 đạt; B3 SKIP (POL-5), B4/B8 SKIP (THR-4). `results/bench/20261107-204741-89a07c/` có CSV/MD/CPU-RAM.
 - Kiểm tra: build/up trên amd64, Compose config, ShellCheck, py_compile, test thật; `make test P=P0` chưa chạy được vì THR-2 chưa có runner.
 - Bàn giao: `docs/trung-handoff.md`, `tls-limitations.md`, `wireshark.md`. Dùng log TLS + cổng client để nối dòng CONNECT cuối bị mất header test ID.
-- Checklist bàn giao 2026-11-09: [x] nhánh TLS riêng, sửa liên kết; [ ] clone sạch amd64; [ ] push/PR; [ ] ZIP + SHA256SUMS. Số liệu 07/11 giữ nguyên; chạy lại ghi riêng.
+- Bàn giao 2026-11-09: [x] nhánh riêng; [x] clone sạch amd64 tại `cbc7cb1f7dc75a5837b5838a87bc95f79c605f52`; [x] [PR #3](https://github.com/UIT24521892/NT140_SecureWebProxy/pull/3). ZIP gửi riêng được chốt theo PR-head SHA, có README-evidence/SHA256SUMS/checksum ZIP.
+- Clone sạch 09/11: init/build/up + 3 mode parse + restart/probe đạt; PKI/probe 9/9, testweb 5/5; S7–S9 vẫn 18/25, SUPPORT 1/3; benchmark 500 mẫu, B3/B4/B8 vẫn SKIP. Runner phục hồi mode/giờ và giữ nguyên .env; parser THR-3 16 trường đạt. Output: `results/handoff/20261109/`; không suy ra auth đã đạt khi POL-1 chưa ghép.
 - Còn chờ: POL-2/3/5 + THR-2/4, chạy arm64, ảnh ICAP/Wireshark, review DOC-2. Lab đã phục hồi selective/giờ ban đầu, tắt TLS key log tạm.
 
 ## Track THR (TV3, amd64)
