@@ -43,7 +43,7 @@ tls-mode: ## Switch SslBump mode: MODE=splice|bump|selective
 	@bash scripts/set-tls-mode.sh "$(MODE)"
 
 worktime: ## Switch work hours ACL: MODE=real|always|never
-	$(call todo,POL-4)
+	@scripts/set-worktime.sh $(MODE)
 
 icap-bypass: ## ICAP fail-open/closed: MODE=on|off
 	@scripts/set-icap.sh $(MODE)
