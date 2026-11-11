@@ -100,6 +100,53 @@ def find_by_test_id(test_id: str, path: Path = DEFAULT_LOG,
         time.sleep(interval)
 
 
+# Written by docker/squid/prepare-tls.sh: the `lab` fields plus the client port.
+TLS_TRACE = DEFAULT_LOG.parent / "access_tls.log"
+
+
+def connection_records(test_id: str, path: Path | None = None) -> list[dict]:
+    """Records on the same client connection as the request carrying test_id.
+
+    For a spliced or terminated CONNECT, Squid logs the request headers on a
+    NONE_NONE line and the final TCP_TUNNEL line without them (docs/verify-log.md).
+    access_tls.log adds the client port, which lets the two lines be joined.
+    """
+    path = path or TLS_TRACE
+    if not path.exists():
+        return []
+    parsed: list[tuple[dict, str]] = []
+    with path.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            parts = line.rstrip("\r\n").split("\t")
+            if len(parts) == len(FIELDS) + 1:
+                parsed.append((parse_line("\t".join(parts[:-1])), parts[-1]))
+    anchors = [i for i, (rec, _) in enumerate(parsed) if rec["test_id"] == test_id]
+    if not anchors:
+        return []
+    start = anchors[-1]
+    conn = (parsed[start][0]["client_ip"], parsed[start][1])
+    return [rec for rec, port in parsed[start:] if (rec["client_ip"], port) == conn]
+
+
+def all_records(test_id: str) -> list[dict]:
+    """Lines tagged with test_id plus the untagged lines of the same connection."""
+    return records_for(test_id) + [r for r in connection_records(test_id)
+                                   if r["test_id"] != test_id]
+
+
+def best_record(test_id: str, timeout: float = 2.0, interval: float = 0.2) -> dict | None:
+    """Last completed record for test_id (not NONE_NONE if one exists), with retry."""
+    deadline = time.monotonic() + timeout
+    while True:
+        recs = all_records(test_id)
+        done = [r for r in recs if r["result"] != "NONE_NONE"]
+        if done:
+            return done[-1]
+        if time.monotonic() >= deadline:
+            return recs[-1] if recs else None
+        time.sleep(interval)
+
+
 def evidence(rec: dict | None) -> str:
     """Evidence string for the results table: %Ss/%>Hs, policy, bump_mode."""
     if rec is None:
