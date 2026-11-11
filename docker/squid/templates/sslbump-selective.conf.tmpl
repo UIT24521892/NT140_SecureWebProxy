@@ -1,0 +1,5 @@
+# TLS-3: exempt sensitive destinations and BYOD (spec §6.2).
+include /etc/squid/conf.d/20-sslbump-common.inc
+ssl_bump splice nobump_sni
+ssl_bump splice net_guest
+ssl_bump bump all

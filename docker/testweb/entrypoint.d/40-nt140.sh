@@ -4,11 +4,7 @@ set -eu
 
 mkdir -p /srv/data /etc/nginx/nt140
 
-# Fixed random payloads, generated once per container start (never committed).
-for size in 1 2 10; do
-  [ -f "/srv/data/${size}m.bin" ] || head -c $((size * 1024 * 1024)) /dev/urandom > "/srv/data/${size}m.bin"
-done
-[ -f /srv/data/1m-nocache.bin ] || head -c 1048576 /dev/urandom > /srv/data/1m-nocache.bin
+python3 /usr/local/lib/nt140/generate-fixtures.py /srv/data
 
 if [ -f /opt/certs/testweb.crt ] && [ -f /opt/certs/testweb.key ]; then
   cat > /etc/nginx/nt140/tls.conf <<'CONF'

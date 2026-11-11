@@ -6,5 +6,6 @@ RUN apt-get update \
       curl openssl ca-certificates python3 dnsutils iproute2 iputils-ping netcat-openbsd tzdata \
  && rm -rf /var/lib/apt/lists/*
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["sleep", "infinity"]

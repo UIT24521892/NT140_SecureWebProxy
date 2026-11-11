@@ -19,6 +19,9 @@ COPY conf/conf.d/ /etc/squid/conf.d/
 COPY templates/ /etc/squid/templates/
 COPY errors/ /etc/squid/errors-lab/
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY prepare-tls.sh /usr/local/lib/nt140/prepare-tls.sh
+COPY switch-tls.sh /usr/local/lib/nt140/switch-tls.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/lib/nt140/*.sh
 
 EXPOSE 3128
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

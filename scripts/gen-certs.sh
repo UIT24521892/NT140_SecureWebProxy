@@ -8,6 +8,10 @@ cd "$(dirname "$0")/.."
 OUT=certs
 force=0
 if [ "${1:-}" = "--force" ]; then force=1; fi
+if [ "$#" -gt 1 ] || { [ "$#" -eq 1 ] && [ "$force" = 0 ]; }; then
+  echo 'usage: gen-certs.sh [--force]' >&2
+  exit 2
+fi
 
 mkdir -p "$OUT"
 tmp=$(mktemp -d)
@@ -24,9 +28,14 @@ public_ca_created=0
 # make_ca NAME SUBJECT
 make_ca() {
   local name=$1 subj=$2
+  ca_created=0
   if [ -f "$OUT/$name.crt" ] && [ -f "$OUT/$name.key" ]; then
+    openssl x509 -in "$OUT/$name.crt" -noout -checkend 0 >/dev/null
+    cert_pub=$(openssl x509 -in "$OUT/$name.crt" -pubkey -noout)
+    key_pub=$(openssl pkey -in "$OUT/$name.key" -pubout 2>/dev/null)
+    [ "$cert_pub" = "$key_pub" ] || { echo "gen-certs: $name key mismatch; use --force" >&2; exit 1; }
     echo "gen-certs: keep $name"
-    return 1
+    return 0
   fi
   cat > "$tmp/$name.ext" <<'EOF'
 basicConstraints = critical, CA:TRUE
@@ -38,11 +47,13 @@ EOF
   openssl x509 -req -in "$tmp/$name.csr" -signkey "$OUT/$name.key" -days 3650 -sha256 \
     -set_serial "$(serial)" -extfile "$tmp/$name.ext" -out "$OUT/$name.crt" 2>/dev/null
   chmod 600 "$OUT/$name.key"
+  ca_created=1
   echo "gen-certs: created $name"
 }
 
-if make_ca lab-public-ca "/O=UIT NT140 Lab/CN=NT140 Lab Public Root CA"; then public_ca_created=1; fi
-make_ca lab-proxy-ca "/O=UIT NT140 Lab/CN=NT140 SWG Proxy CA" || true
+make_ca lab-public-ca "/O=UIT NT140 Lab/CN=NT140 Lab Public Root CA"
+public_ca_created=$ca_created
+make_ca lab-proxy-ca "/O=UIT NT140 Lab/CN=NT140 SWG Proxy CA"
 
 # testweb leaf, signed by the public CA. Re-issued whenever the CA is new.
 if [ "$public_ca_created" = 1 ] || [ ! -f "$OUT/testweb.crt" ] || [ ! -f "$OUT/testweb.key" ]; then
