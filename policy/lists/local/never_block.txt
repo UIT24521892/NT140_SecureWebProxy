@@ -1,0 +1,6 @@
+.google.com
+.github.com
+.microsoft.com
+.apple.com
+.cloudflare.com
+.wikipedia.org
