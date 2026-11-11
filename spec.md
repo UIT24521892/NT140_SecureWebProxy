@@ -322,7 +322,7 @@ Script `scripts/set-worktime.sh real|always|never` ghi file `policy/generated/wo
   - Tên là `ERR_LAB_<REASON>`, viết hoa, đổi `-` thành `_`. Ví dụ: `ERR_LAB_IP_LITERAL`.
   - Nội dung HTML song ngữ Việt/Anh, gồm: lý do, URL (`%U`), IP client (`%i`), user (`%a`), thời gian (`%T`), và marker **bắt buộc** `<!-- LAB-BLOCK reason=<reason> -->`.
 - **Cài template:** Dockerfile đặt các template vào error directory của Squid **[VERIFY đường dẫn]**. Nếu dùng `error_directory` riêng thì phải copy kèm toàn bộ template mặc định.
-- **Hạn chế cần đưa vào báo cáo:** ở chế độ splice, HTTPS bị chặn ngay tại bước CONNECT, nên trình duyệt **không hiển thị** được trang chặn mà chỉ báo lỗi proxy.
+- **Hạn chế cần đưa vào báo cáo:** khi HTTPS bị chặn ở bước CONNECT, Squid (cổng `ssl-bump`) trả 200 cho CONNECT rồi bump kết nối để đưa trang chặn. Máy tin Proxy CA thấy trang chặn; máy **không** tin Proxy CA (guest/BYOD) chỉ thấy lỗi chứng chỉ, kể cả ở mode splice (xem verify-log 2026-11-11 và open-questions #2).
 
 ### 5.7 Giới hạn băng thông
 
