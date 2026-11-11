@@ -1,0 +1,4 @@
+.stream.lab.test
+.youtube.com
+.googlevideo.com
+.netflix.com

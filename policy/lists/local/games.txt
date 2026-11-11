@@ -1,0 +1,3 @@
+.games.lab.test
+.roblox.com
+.steampowered.com
