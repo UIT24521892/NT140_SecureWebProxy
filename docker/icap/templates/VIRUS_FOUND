@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="utf-8"><title>NT140 SWG: phát hiện mã độc / malware detected</title></head>
+<body>
+<h1>Đã chặn tải xuống: phát hiện mã độc</h1>
+<p>Download blocked: malware detected.</p>
+<ul>
+  <li>Tên mã độc / Malware name: <b>%VVN</b></li>
+  <li>URL: <b>%huo</b></li>
+  <li>Bộ quét / Engine: <b>%VVV</b></li>
+</ul>
+<p>Liên hệ quản trị viên nếu bạn cho rằng đây là chặn nhầm.<br>
+Contact your administrator if you believe this is a false positive.</p>
+<hr><p>NT140 Secure Web Gateway (ICAP service %iu)</p>
+<!-- LAB-BLOCK reason=malware-content -->
+</body>
+</html>

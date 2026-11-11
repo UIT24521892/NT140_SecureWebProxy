@@ -27,6 +27,7 @@ volumes:
   squid-cache:
   squid-ssldb:
   clamav-db:
+  clamd-sock:
 
 services:
   # --- Track INF/POL (TV1) -------------------------------------------------
@@ -61,7 +62,7 @@ services:
       retries: 6
     depends_on:
       testweb: { condition: service_healthy }
-      # THR-4: add `icap: { condition: service_healthy }` when the av profile is removed.
+      icap: { condition: service_healthy }
 
   # --- Track TLS (TV2) -----------------------------------------------------
   client-staff:
@@ -144,27 +145,47 @@ services:
       retries: 10
 
   # --- Track THR (TV3) -----------------------------------------------------
-  # THR-4: remove the `av` profile once docker/icap is implemented.
-  icap:
+  icap: # THR-4, spec §7
     <<: *common
-    profiles: [av]
     build: docker/icap
     image: nt140/icap:dev
     networks:
       svc: { ipv4_address: 10.30.0.20 }
+    volumes:
+      # clamd's unix socket, shared by the clamav service (see clamd_mod.conf).
+      - clamd-sock:/run/clamd-sock
+    healthcheck:
+      # c-icap-client exits 0 even on an ICAP error, so match the status line.
+      test: ["CMD-SHELL", "c-icap-client -i 127.0.0.1 -p 1344 -s virus_scan 2>&1 | grep -q 'ICAP/1.0 200 OK'"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
     depends_on:
       clamav: { condition: service_healthy }
 
-  clamav:
+  clamav: # THR-4, spec §7
     <<: *common
-    profiles: [av]
     image: clamav/clamav-debian:1.4  # spec §2.1: the Alpine image has no arm64
+    environment:
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+      # The image turns CLAMD_CONF_<Name> into clamd.conf lines. Lower peak RAM on reload.
+      CLAMD_CONF_ConcurrentDatabaseReload: "no"
     networks:
       svc: { ipv4_address: 10.30.0.21 }
       wan: { ipv4_address: 172.30.0.21 }
     volumes:
       - clamav-db:/var/lib/clamav
-    # THR-4: add a clamd healthcheck with start_period >= 300s (spec §7).
+      # The image puts clamd's LocalSocket in /tmp; share it with icap (spec §7).
+      - clamd-sock:/tmp
+    healthcheck:
+      # Script shipped in the image: sends PING to clamd on 3310 and expects PONG.
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      # The first start downloads the signature database (spec §7).
+      start_period: 360s
 
   goaccess: # THR-7
     <<: *common

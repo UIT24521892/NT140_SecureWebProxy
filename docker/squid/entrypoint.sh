@@ -16,7 +16,12 @@ case "$ICAP_BYPASS" in
   on) ICAP_BYPASS_FLAG=1 ;;
   *) die "ICAP_BYPASS must be on|off, got '$ICAP_BYPASS'" ;;
 esac
-export TLS_MODE ICAP_BYPASS_FLAG ICAP_ENABLED GUEST_RATE_BYTES
+case "$ICAP_ENABLED" in
+  1) ICAP_ACCESS=allow ;;
+  0) ICAP_ACCESS=deny ;;
+  *) die "ICAP_ENABLED must be 0|1, got '$ICAP_ENABLED'" ;;
+esac
+export TLS_MODE ICAP_BYPASS_FLAG ICAP_ACCESS ICAP_ENABLED GUEST_RATE_BYTES
 
 POLICY=/etc/squid/policy
 TEMPLATES=/etc/squid/templates
@@ -25,11 +30,6 @@ CONFD=/etc/squid/conf.d
 # ./policy is mounted read-only; generated files come from `make init` (spec §5.5).
 [ -f "$POLICY/generated/work_hours.conf" ] || die "missing $POLICY/generated/work_hours.conf, run 'make init' on the host"
 
-# Lab public CA: lets squid verify testweb when bumping (spec §3).
-if [ -f /opt/certs/lab-public-ca.crt ]; then
-  cp /opt/certs/lab-public-ca.crt /usr/local/share/ca-certificates/nt140-lab-public-ca.crt
-  update-ca-certificates >/dev/null
-fi
 # Basic auth: htpasswd and group files from users.lab, generated inside the container (spec §4).
 USERS_SRC="$POLICY/auth/users.lab"
 AUTH_DIR=/etc/squid/auth
@@ -53,12 +53,17 @@ chmod 750 "$AUTH_DIR"
 chmod 640 "$AUTH_DIR"/*
 log "auth: $(wc -l < "$AUTH_DIR/users.htpasswd") users, admin=$(wc -l < "$AUTH_DIR/group_admin.txt") staff=$(wc -l < "$AUTH_DIR/group_staff.txt")"
 
+# Lab public CA: lets squid verify testweb when bumping (spec §3).
+if [ -f /opt/certs/lab-public-ca.crt ]; then
+  cp /opt/certs/lab-public-ca.crt /usr/local/share/ca-certificates/nt140-lab-public-ca.crt
+  update-ca-certificates >/dev/null
+fi
 
 # Render templates with an explicit variable whitelist: squid does not read env vars (spec §15).
 render() {
   local src=$1 dst=$2
   # shellcheck disable=SC2016  # the literal ${VAR} list is what envsubst expects
-  envsubst '${TLS_MODE} ${ICAP_BYPASS_FLAG} ${ICAP_ENABLED} ${GUEST_RATE_BYTES}' < "$src" > "$dst"
+  envsubst '${TLS_MODE} ${ICAP_BYPASS_FLAG} ${ICAP_ACCESS} ${ICAP_ENABLED} ${GUEST_RATE_BYTES}' < "$src" > "$dst"
   log "rendered $(basename "$dst") from $(basename "$src")"
 }
 
