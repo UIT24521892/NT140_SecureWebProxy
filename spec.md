@@ -257,8 +257,8 @@ http_access deny !Safe_ports
 http_access deny CONNECT !SSL_ports
 http_access allow localhost manager
 http_access deny manager
-http_access deny to_localhost                      # [VERIFY] ACL dựng sẵn trong Squid 6
-http_access deny to_linklocal
+http_access deny !dryrun to_localhost              # ACL dựng sẵn, kiểu 'dst' (tra DNS). Miễn cho dryrun, xem §12.3
+http_access deny !dryrun to_linklocal
 # 1. Threat: áp cho mọi đối tượng
 http_access deny threat_phishing mark_phishing
 http_access deny threat_malware mark_malware
@@ -648,10 +648,11 @@ Mục đích: kiểm tra một host trong feed có bị chặn hay không, mà *
 
 ```squid
 acl dryrun req_header X-Lab-Dryrun -i ^1$
-never_direct allow dryrun        # (conf.d/14-dryrun.conf) không có cache_peer → request không bị chặn sẽ trả 503, không ra Internet
+never_direct allow dryrun        # (conf.d/14-dryrun.conf) không có cache_peer → request không bị chặn sẽ trả 502, không ra Internet
 ```
 
-- Request bị chặn thì nhận 403 (`BLOCK`). Request lọt qua thì nhận 503 (`UPSTREAM_ERROR`), tức là FAIL với các case kiểu blocklist.
+- Request bị chặn thì nhận 403 (`BLOCK`). Request lọt qua thì nhận 502 (`UPSTREAM_ERROR`), tức là FAIL với các case kiểu blocklist.
+- **Không tra DNS:** ACL kiểu `dst` (`to_localhost`, `to_linklocal`) làm Squid phân giải hostname ngay cả khi request bị từ chối sau đó. Vì vậy hai dòng này trong §5.4 có `!dryrun` đứng trước, và mọi rule mới dùng ACL `dst` đều phải được chặn trước bằng `!dryrun` hoặc `dst_is_ip`. Request dryrun không cần hai rule đó vì `never_direct` đã ngăn nó đi tới bất kỳ đích nào.
 - Dryrun chỉ dùng được với URL `http://`.
 
 ### 12.4 Đánh giá
