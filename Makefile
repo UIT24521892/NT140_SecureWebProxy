@@ -1,13 +1,14 @@
 # NT140 Secure Web Gateway Lab (spec §15). Compatible with GNU make 3.81 (macOS).
 SHELL := /bin/bash
 COMPOSE ?= docker compose
+PYTHON ?= python3
 .DEFAULT_GOAL := help
 
 # Targets whose task is not done yet call this and fail loudly.
 todo = @echo "not implemented yet ($(1)), see plan.md §6" >&2; exit 1
 
 .PHONY: help init build up down ps logs clean reconfigure tls-mode worktime icap-bypass \
-        feeds test bench summary eval-fp capture shell-staff shell-guest shell-squid lint
+        feeds test test-tls bench summary eval-fp capture shell-staff shell-guest shell-squid lint
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -39,7 +40,7 @@ reconfigure: ## Reload squid configuration
 	$(COMPOSE) exec squid squid -k reconfigure
 
 tls-mode: ## Switch SslBump mode: MODE=splice|bump|selective
-	$(call todo,TLS-3)
+	@bash scripts/set-tls-mode.sh "$(MODE)"
 
 worktime: ## Switch work hours ACL: MODE=real|always|never
 	$(call todo,POL-4)
@@ -55,7 +56,7 @@ test: ## Run tests (S=S5 for one scenario, P=P0 for a priority)
 	python3 tests/run_all.py $(if $(S),--scenario $(S)) $(if $(P),--priority $(P))
 
 bench: ## Run benchmark B1-B8
-	$(call todo,TLS-7)
+	$(PYTHON) scripts/bench.py $(if $(N),--requests $(N))
 
 summary: ## Summarise squid logs into results/
 	$(call todo,THR-7)
@@ -64,7 +65,10 @@ eval-fp: ## Evaluate blocklist false positives against Tranco
 	$(call todo,THR-8)
 
 capture: ## Capture traffic: NAME=x SECS=30
-	$(call todo,TLS-6)
+	$(PYTHON) scripts/capture.py "$(NAME)" "$(or $(SECS),30)"
+
+test-tls: ## Run TV2 scenarios independently of the pending THR-2 runner
+	$(PYTHON) scripts/test_tls.py $(if $(S),--scenario $(S))
 
 shell-staff: ## Shell in client-staff
 	$(COMPOSE) exec client-staff bash

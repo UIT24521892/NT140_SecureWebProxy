@@ -1,0 +1,10 @@
+# TLS-3, spec §6. Peek only at step1 so bump remains possible at step2.
+http_port 3128 ssl-bump tls-cert=/etc/squid/ssl/lab-proxy-ca.crt tls-key=/etc/squid/ssl/lab-proxy-ca.key generate-host-certificates=on dynamic_cert_mem_cache_size=16MB
+sslcrtd_program /usr/lib/squid/security_file_certgen -s /var/lib/squid/ssl_db -M 16MB
+sslcrtd_children 5
+sslproxy_cert_error deny all
+tls_outgoing_options cafile=/etc/ssl/certs/ca-certificates.crt
+on_unsupported_protocol respond all
+include /etc/squid/tls-keylog.conf
+ssl_bump peek step1
+ssl_bump terminate threat_sni mark_sni_threat

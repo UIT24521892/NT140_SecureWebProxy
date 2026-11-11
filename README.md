@@ -280,3 +280,18 @@ Cần nhớ:
 | `scripts/init.sh: Permission denied` | Clone vào `/mnt/c/...` nên mất quyền thực thi | Clone lại vào `~` theo Bước 3 |
 | `not implemented yet (THR-2)` khi chạy `make test` | Chưa có test runner, không phải lỗi | Kiểm tra bằng tay theo Bước 4 |
 | `407` hoặc `exit=6` trong Bước 4 | Thường là kết quả mong đợi | Đối chiếu với bảng kết quả đúng ở Bước 4 |
+
+## Phần TV2 (TLS)
+
+Hướng dẫn chạy, trạng thái nghiệm thu và phụ thuộc: [docs/trung-handoff.md](docs/trung-handoff.md).
+Đọc thêm [giới hạn HTTPS](docs/tls-limitations.md) và [capture/Wireshark](docs/wireshark.md).
+
+```bash
+make tls-mode MODE=selective
+make test-tls S=S8
+make capture NAME=demo SECS=30
+make bench N=50
+```
+
+`test-tls` chạy riêng S7/S8/S9 khi runner toàn dự án của THR-2 chưa có.
+Các test policy/cache cần phần TV1, các phép đo ICAP cần THR-4; xem báo cáo thật để biết PASS/FAIL/SKIP.

@@ -76,7 +76,9 @@ services:
       lan_staff: { ipv4_address: 10.10.0.101 }
     volumes:
       - ./tests/probe:/opt/lab:ro
-      - ./certs:/opt/certs:ro
+      - ./certs/lab-public-ca.crt:/opt/certs/lab-public-ca.crt:ro
+      - ./certs/lab-proxy-ca.crt:/opt/certs/lab-proxy-ca.crt:ro
+      - ./certs/pinned.sha256:/opt/certs/pinned.sha256:ro
       - ./captures:/captures
 
   client-guest:
@@ -91,12 +93,13 @@ services:
       lan_guest: { ipv4_address: 10.20.0.101 }
     volumes:
       - ./tests/probe:/opt/lab:ro
-      - ./certs:/opt/certs:ro
+      - ./certs/lab-public-ca.crt:/opt/certs/lab-public-ca.crt:ro
+      - ./certs/pinned.sha256:/opt/certs/pinned.sha256:ro
       - ./captures:/captures
 
   sniffer: # TLS-6
     profiles: [capture]
-    image: nicolaka/netshoot:v0.13  # [VERIFY] tag + arm64 before TLS-6
+    image: nicolaka/netshoot:v0.13  # Verified 2026-11-07: amd64 + arm64.
     network_mode: service:squid
     volumes:
       - ./captures:/captures
@@ -132,7 +135,8 @@ services:
           - pinned.lab.test
           - dns.lab.test
     volumes:
-      - ./certs:/opt/certs:ro
+      - ./certs/testweb.crt:/opt/certs/testweb.crt:ro
+      - ./certs/testweb.key:/opt/certs/testweb.key:ro
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
       interval: 5s

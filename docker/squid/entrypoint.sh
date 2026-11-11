@@ -25,6 +25,11 @@ CONFD=/etc/squid/conf.d
 # ./policy is mounted read-only; generated files come from `make init` (spec §5.5).
 [ -f "$POLICY/generated/work_hours.conf" ] || die "missing $POLICY/generated/work_hours.conf, run 'make init' on the host"
 
+# Lab public CA: lets squid verify testweb when bumping (spec §3).
+if [ -f /opt/certs/lab-public-ca.crt ]; then
+  cp /opt/certs/lab-public-ca.crt /usr/local/share/ca-certificates/nt140-lab-public-ca.crt
+  update-ca-certificates >/dev/null
+fi
 # Basic auth: htpasswd and group files from users.lab, generated inside the container (spec §4).
 USERS_SRC="$POLICY/auth/users.lab"
 AUTH_DIR=/etc/squid/auth
@@ -48,11 +53,6 @@ chmod 750 "$AUTH_DIR"
 chmod 640 "$AUTH_DIR"/*
 log "auth: $(wc -l < "$AUTH_DIR/users.htpasswd") users, admin=$(wc -l < "$AUTH_DIR/group_admin.txt") staff=$(wc -l < "$AUTH_DIR/group_staff.txt")"
 
-# Lab public CA: lets squid verify testweb when bumping (spec §3).
-if [ -f /opt/certs/lab-public-ca.crt ]; then
-  cp /opt/certs/lab-public-ca.crt /usr/local/share/ca-certificates/nt140-lab-public-ca.crt
-  update-ca-certificates >/dev/null
-fi
 
 # Render templates with an explicit variable whitelist: squid does not read env vars (spec §15).
 render() {
@@ -62,12 +62,9 @@ render() {
   log "rendered $(basename "$dst") from $(basename "$src")"
 }
 
-sslbump_tmpl="$TEMPLATES/sslbump-$TLS_MODE.conf.tmpl"
-if [ ! -f "$sslbump_tmpl" ]; then
-  log "no template for TLS_MODE=$TLS_MODE yet (TLS-3), using placeholder"
-  sslbump_tmpl="$TEMPLATES/sslbump-placeholder.conf.tmpl"
-fi
-render "$sslbump_tmpl" "$CONFD/20-sslbump.conf"
+# TLS-3: shared with live mode switching. Keys stay root:proxy 0640.
+[ -f /etc/squid/tls-keylog.conf ] || : > /etc/squid/tls-keylog.conf
+/usr/local/lib/nt140/prepare-tls.sh "$TLS_MODE"
 
 if [ -f "$TEMPLATES/icap.conf.tmpl" ]; then
   render "$TEMPLATES/icap.conf.tmpl" "$CONFD/30-icap.conf"
@@ -85,6 +82,8 @@ mkdir -p /var/log/squid /var/spool/squid /var/lib/squid
 chown -R proxy:proxy /var/log/squid /var/spool/squid /var/lib/squid
 
 # Create cache_dir structure on first start (no-op without cache_dir).
+# A restarted container keeps its old PID file; remove it before any Squid invocation.
+rm -f /run/squid.pid
 squid -z --foreground -f /etc/squid/squid.conf 2>&1 | sed 's/^/squid -z: /' >&2
 
 if ! parse_out=$(squid -k parse -f /etc/squid/squid.conf 2>&1); then
@@ -97,5 +96,4 @@ if printf '%s\n' "$parse_out" | grep -qE 'FATAL|ERROR'; then
 fi
 log "squid -k parse ok"
 
-rm -f /run/squid.pid
 exec squid -N -d 1 -f /etc/squid/squid.conf

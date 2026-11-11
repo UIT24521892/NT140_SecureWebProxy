@@ -8,17 +8,21 @@ install_ca() {
     echo "client: trusting $1"
   else
     echo "client: /opt/certs/$1.crt missing (run make init)" >&2
+    exit 1
   fi
 }
 
 install_ca lab-public-ca
 if [ "${MANAGED:-0}" = "1" ]; then
   install_ca lab-proxy-ca
+else
+  rm -f /usr/local/share/ca-certificates/nt140-lab-proxy-ca.crt
 fi
 update-ca-certificates >/dev/null
 
 # Convenience for manual demos; tests pass -x explicitly (spec §9.1).
 if [ -n "${PROXY_URL:-}" ]; then
+  export http_proxy="$PROXY_URL" https_proxy="$PROXY_URL"
   printf 'export http_proxy=%s https_proxy=%s\n' "$PROXY_URL" "$PROXY_URL" > /etc/profile.d/nt140-proxy.sh
 fi
 
