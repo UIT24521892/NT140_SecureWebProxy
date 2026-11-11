@@ -1,0 +1,7 @@
+# Guest bandwidth limit (spec §5.7). Owner: POL-5. Rendered to conf.d/51-delay.conf.
+# Class 2: no aggregate limit (-1/-1), ${GUEST_RATE_BYTES} bytes/s per client host.
+delay_pools 1
+delay_class 1 2
+delay_parameters 1 -1/-1 ${GUEST_RATE_BYTES}/${GUEST_RATE_BYTES}
+delay_access 1 allow net_guest
+delay_access 1 deny all
