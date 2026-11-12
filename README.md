@@ -153,27 +153,32 @@ make ps
 - `make init` tạo `.env`, feed rỗng, `work_hours.conf` và chứng chỉ trong `certs/`. Chạy lại nhiều lần vẫn an toàn vì file đã có sẽ được giữ nguyên. Các file này không được commit.
 - `make up` build image rồi đợi các service sẵn sàng. Lần đầu sẽ lâu hơn vì phải tải image.
 
-Kết quả `make ps` đúng là có đủ **4 service**:
+Kết quả `make ps` đúng là có đủ **6 service**:
 
 | Service | Cột `STATUS` |
 |---|---|
 | `squid` | `Up ... (healthy)` |
 | `testweb` | `Up ... (healthy)` |
+| `clamav` | `Up ... (healthy)`. Dùng khoảng 1 GB RAM |
+| `icap` | `Up ... (healthy)` |
 | `client-staff` | `Up ...` (không có healthcheck nên không hiện `healthy`) |
 | `client-guest` | `Up ...` (không có healthcheck nên không hiện `healthy`) |
 
-`icap`, `clamav`, `goaccess`, `sniffer`, `tcpecho` không xuất hiện là bình thường vì chúng thuộc profile chưa bật.
+`goaccess`, `sniffer`, `tcpecho` không xuất hiện là bình thường vì chúng thuộc profile chưa bật.
 
 ### Bước 4: Xác nhận lab chạy đúng
 
-Hiện chưa có test runner nên phải kiểm tra bằng tay (`make test` chưa dùng được, xem [Lỗi thường gặp](#lỗi-thường-gặp)). Các lệnh dưới đây chạy tại thư mục gốc repo, trên bash và zsh đều được.
-
-Các kiểm tra xác thực bên dưới cần code POL-1. Nếu `main` chưa ghép POL-1, chuyển sang nhánh đang review rồi build lại trước khi kiểm tra:
+Cách nhanh nhất là chạy bộ test tự động:
 
 ```bash
-git switch pol/POL-1-auth
-make up
+make test S=S0     # kiểm tra khởi động, mong đợi 6 PASS
+make test          # mọi kịch bản đã có module
+cat results/latest/results.md
 ```
+
+`make test` thoát với mã khác 0 nếu có case `FAIL`. Case `PASS (limitation)` là case cố ý chứng minh một giới hạn. Trạng thái mới nhất của từng kịch bản xem ở [docs/progress.md](docs/progress.md).
+
+Các lệnh dưới đây để kiểm tra bằng tay từng phần, chạy tại thư mục gốc repo, trên bash và zsh đều được.
 
 **Squid và cô lập mạng:**
 
@@ -221,11 +226,11 @@ docker compose exec client-guest curl -s -o /dev/null -w 'guest: %{http_code}\n'
 docker compose exec client-staff curl -sv -o /dev/null -x $STAFF -U alice:alice123 https://allowed.lab.test/ 2>&1 | grep -i issuer
 ```
 
-Kết quả đúng ở giai đoạn hiện tại (TLS-3 chưa xong nên chưa giải mã HTTPS):
+Kết quả đúng ở mode TLS mặc định (`selective`):
 
 - Staff không đăng nhập ra `http=000 proxy=407` và `exit=56`. Đây **không phải lỗi**: proxy đã từ chối CONNECT bằng 407.
 - `alice` và guest ra `200`.
-- Issuer có `CN=NT140 Lab Public Root CA`.
+- Issuer mà `alice` thấy là `CN=NT140 SWG Proxy CA`: kết nối của máy managed được proxy giải mã. Guest (BYOD) không bị giải mã nên vẫn thấy `CN=NT140 Lab Public Root CA`.
 
 **Log ghi đúng người dùng:**
 
@@ -235,12 +240,10 @@ docker compose exec squid tail -n 5 /var/log/squid/access.log
 
 Nếu chạy theo đúng thứ tự trên, 5 dòng cuối là của khối HTTPS:
 
-- Yêu cầu của `alice` có chữ `alice` trước `HIER_DIRECT`, ví dụ `TCP_TUNNEL/200 2432 CONNECT allowed.lab.test:443 alice HIER_DIRECT/172.30.0.50 -`.
-- Yêu cầu của guest và yêu cầu bị từ chối có dấu `-` ở vị trí đó, ví dụ `TCP_DENIED/407 3474 CONNECT allowed.lab.test:443 - HIER_NONE/- text/html`.
+- Yêu cầu của `alice` có chữ `alice` ở cột user, ví dụ `TCP_MISS/200 396 GET https://allowed.lab.test/ alice HIER_DIRECT/172.30.0.50 text/html` (thấy được URL đầy đủ vì đã giải mã).
+- Yêu cầu của guest và yêu cầu bị từ chối có dấu `-` ở vị trí đó, ví dụ `TCP_TUNNEL/200 2430 CONNECT allowed.lab.test:443 - HIER_DIRECT/172.30.0.50 -`.
 
-Với yêu cầu HTTP, mã có thể là `TCP_MISS/200` hoặc `TCP_REFRESH_MODIFIED/200`, đều đúng.
-
-Khi các chính sách chặn (POL-3) và SslBump (TLS-3) được ghép vào, một số kết quả trên sẽ đổi. Chuẩn cuối cùng vẫn là spec §13.
+Mã kết quả có thể là `TCP_MISS`, `TCP_MEM_HIT` hoặc `TCP_REFRESH_MODIFIED`, đều đúng. Chuẩn cuối cùng là spec §13.
 
 ## Dùng hằng ngày
 
@@ -278,7 +281,7 @@ Cần nhớ:
 | `missing .../work_hours.conf, run 'make init' on the host` (trong log `squid`) | Chưa chạy `make init` | Chạy `make init`, rồi `make up` |
 | `/usr/bin/env: 'bash\r': No such file or directory` | Script bị đổi sang CRLF, thường do clone bằng Git for Windows | Clone lại trong shell Ubuntu theo Bước 3 |
 | `scripts/init.sh: Permission denied` | Clone vào `/mnt/c/...` nên mất quyền thực thi | Clone lại vào `~` theo Bước 3 |
-| `not implemented yet (THR-2)` khi chạy `make test` | Chưa có test runner, không phải lỗi | Kiểm tra bằng tay theo Bước 4 |
+| `not implemented yet (...)` khi chạy một lệnh `make` | Task trong ngoặc chưa làm, không phải lỗi | Xem [docs/progress.md](docs/progress.md) |
 | `407` hoặc `exit=6` trong Bước 4 | Thường là kết quả mong đợi | Đối chiếu với bảng kết quả đúng ở Bước 4 |
 
 ## Phần TV2 (TLS)
@@ -293,5 +296,5 @@ make capture NAME=demo SECS=30
 make bench N=50
 ```
 
-`test-tls` chạy riêng S7/S8/S9 khi runner toàn dự án của THR-2 chưa có.
+`test-tls` là bộ chạy riêng của TV2 cho S7/S8/S9; `make test` đã chạy được cùng các kịch bản này.
 Các test policy/cache cần phần TV1, các phép đo ICAP cần THR-4; xem báo cáo thật để biết PASS/FAIL/SKIP.

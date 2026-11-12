@@ -322,7 +322,7 @@ Script `scripts/set-worktime.sh real|always|never` ghi file `policy/generated/wo
   - Tên là `ERR_LAB_<REASON>`, viết hoa, đổi `-` thành `_`. Ví dụ: `ERR_LAB_IP_LITERAL`.
   - Nội dung HTML song ngữ Việt/Anh, gồm: lý do, URL (`%U`), IP client (`%i`), user (`%a`), thời gian (`%T`), và marker **bắt buộc** `<!-- LAB-BLOCK reason=<reason> -->`.
 - **Cài template:** Dockerfile đặt các template vào error directory của Squid **[VERIFY đường dẫn]**. Nếu dùng `error_directory` riêng thì phải copy kèm toàn bộ template mặc định.
-- **Hạn chế cần đưa vào báo cáo:** ở chế độ splice, HTTPS bị chặn ngay tại bước CONNECT, nên trình duyệt **không hiển thị** được trang chặn mà chỉ báo lỗi proxy.
+- **Hạn chế cần đưa vào báo cáo:** khi HTTPS bị chặn ở bước CONNECT, Squid (cổng `ssl-bump`) trả 200 cho CONNECT rồi bump kết nối để đưa trang chặn. Máy tin Proxy CA thấy trang chặn; máy **không** tin Proxy CA (guest/BYOD) chỉ thấy lỗi chứng chỉ, kể cả ở mode splice (xem verify-log 2026-11-11 và open-questions #2).
 
 ### 5.7 Giới hạn băng thông
 
@@ -406,25 +406,29 @@ ssl_bump terminate threat_sni mark_sni_threat     # [VERIFY] annotate trong ssl_
 
 ```squid
 icap_enable on
-icap_send_client_ip on
-icap_send_client_username on
+adaptation_send_client_ip on
+adaptation_send_username on
 icap_client_username_header X-Authenticated-User
+icap_connect_timeout 2 seconds
 icap_service svc_av respmod_precache icap://icap:1344/virus_scan bypass=${ICAP_BYPASS_FLAG}
-adaptation_access svc_av allow all
+adaptation_access svc_av ${ICAP_ACCESS} all
 ```
 
+- `ICAP_ENABLED=1` (mặc định) render `ICAP_ACCESS` thành `allow`; `ICAP_ENABLED=0` render thành `deny` (chỉ dùng cho benchmark, §13.1).
+- `icap_connect_timeout` ngắn để fail-closed trả lỗi ngay: container `icap` đã dừng không trả RST, nên với timeout mặc định client sẽ hết giờ trước khi Squid kịp trả 500.
+- `scripts/set-icap.sh on|off` đổi `ICAP_BYPASS`, `scripts/set-icap.sh --enabled 0|1` đổi `ICAP_ENABLED`; cả hai render lại, `squid -k parse`, reconfigure và ghi `.env`.
 - `ICAP_BYPASS=off` (mặc định, fail-closed) render thành `bypass=0`. `ICAP_BYPASS=on` (fail-open) render thành `bypass=1`.
 
 **c-icap:**
 - Nghe cổng 1344, service `virus_scan`, engine `clamd` (module `clamd_mod`).
-- Kết nối tới clamd qua TCP `clamav:3310` **[VERIFY: clamd_mod có hỗ trợ `ClamdHost`/`ClamdPort` không]**. Nếu không hỗ trợ, chia sẻ unix socket qua named volume.
-- Đặt `virus_scan.MaxObjectSize 10M` **[VERIFY tên directive]**. File lớn hơn 10 MB sẽ **không được quét**. Đây là hạn chế được kiểm chứng ở T5.5.
+- Kết nối tới clamd qua **unix socket** dùng chung bằng named volume `clamd-sock` (clamav mount tại `/tmp`, icap mount tại `/run/clamd-sock`; `clamd_mod.ClamdSocket /run/clamd-sock/clamd.sock`). Không dùng TCP `ClamdHost`/`ClamdPort`: qua TCP `clamd_mod` chỉ gửi đường dẫn file tạm, clamd ở container khác không mở được (xem verify-log). Cổng 3310 vẫn dùng cho healthcheck của clamav.
+- Đặt `virus_scan.MaxObjectSize 10M`. File lớn hơn 10 MB sẽ **không được quét**. Đây là hạn chế được kiểm chứng ở T5.5.
 - Quét mọi loại file: `virus_scan.ScanFileTypes TEXT DATA EXECUTABLE ARCHIVE DOCUMENT`.
 - Template `VIRUS_FOUND` tùy biến: hiển thị tên virus và chứa marker `<!-- LAB-BLOCK reason=malware-content -->`.
 
 **clamav:**
 - freshclam chạy khi container start.
-- Healthcheck bằng ping clamd **[VERIFY lệnh]**, đặt `start_period` ≥ 300s vì lần đầu tải signature khá lâu.
+- Healthcheck bằng `clamdcheck.sh` có sẵn trong image (gửi `PING` tới cổng 3310), đặt `start_period` ≥ 300s phòng khi phải tải signature. Image `clamav-debian:1.4` có sẵn bộ signature nên lần đầu thường lên trong vài chục giây.
 - Thứ tự phụ thuộc: `squid` depends_on `icap` (healthy), `icap` depends_on `clamav` (healthy).
 - Giữ `AlertEncrypted no` (mặc định), nên zip có mật khẩu sẽ lọt qua (T5.4). **P2:** bật `AlertEncrypted yes` rồi đo lại.
 
@@ -873,8 +877,8 @@ project_nt140/
 │   │            conf/conf.d/{00-base,10-acl-network,11-acl-lists,12-acl-auth,13-acl-misc,14-dryrun,
 │   │                         40-access,41-reply-access,50-cache,51-delay,60-logging,70-errors}.conf,
 │   │            templates/{sslbump-splice,sslbump-bump,sslbump-selective,icap,delay}.conf.tmpl,
-│   │            errors/ERR_LAB_*
-│   ├── icap/    Dockerfile, entrypoint.sh, c-icap.conf, virus_scan.conf, clamd_mod.conf, templates/VIRUS_FOUND
+│   │            errors/{ERR_LAB.tmpl,reasons.tsv,build-errors.sh} (sinh ERR_LAB_<REASON> lúc build image)
+│   ├── icap/    Dockerfile, entrypoint.sh, c-icap.local.conf (include vào cuối c-icap.conf của gói), virus_scan.conf, clamd_mod.conf, templates/VIRUS_FOUND
 │   ├── testweb/ Dockerfile, nginx.conf, entrypoint.sh (sinh file test), html/
 │   └── client/  Dockerfile, entrypoint.sh
 ├── policy/
@@ -903,11 +907,13 @@ project_nt140/
 | `./captures` | client, sniffer `/captures` | rw |
 | volume `squid-cache` | squid `/var/spool/squid` | rw |
 | volume `squid-ssldb` | squid `/var/lib/squid/ssl_db` | rw |
+| volume `clamav-db` | clamav `/var/lib/clamav` | rw |
+| volume `clamd-sock` | clamav `/tmp`, icap `/run/clamd-sock` | rw. Unix socket của clamd (§7) |
 
 File sinh trong container squid: `/etc/squid/auth/{users.htpasswd,group_admin.txt,group_staff.txt}` (§4), `/etc/squid/conf.d/{20-sslbump,30-icap,51-delay}.conf` (render từ template).
 
 **Render cấu hình:**
-- Entrypoint của squid render `*.conf.tmpl` bằng `envsubst`, với **whitelist biến**: `TLS_MODE`, `ICAP_BYPASS_FLAG`, `ICAP_ENABLED`, `GUEST_RATE_BYTES`.
+- Entrypoint của squid render `*.conf.tmpl` bằng `envsubst`, với **whitelist biến**: `TLS_MODE`, `ICAP_BYPASS_FLAG`, `ICAP_ACCESS`, `ICAP_ENABLED`, `GUEST_RATE_BYTES`.
 - Lý do: Squid không tự đọc biến môi trường trong `squid.conf`.
 - Sau khi render, chạy `squid -k parse` trước khi start. Nếu parse lỗi thì thoát với mã khác 0.
 - **Tài liệu tra cứu trong image:** trước khi ghi đè `squid.conf`, Dockerfile của squid phải copy file `/etc/squid/squid.conf` gốc (bản có comment đầy đủ của gói Ubuntu) sang `/usr/share/doc/nt140/squid.conf.documented` **[VERIFY]**. Đây là tài liệu dùng để tra cứu directive đúng với phiên bản đang cài.

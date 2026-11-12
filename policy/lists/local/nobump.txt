@@ -1,0 +1,4 @@
+.uitbank.lab.test
+.vietcombank.com.vn
+.bidv.com.vn
+.vssid.vn

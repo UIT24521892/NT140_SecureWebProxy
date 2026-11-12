@@ -1,0 +1,12 @@
+phishing	Trang này nằm trong danh sách lừa đảo (phishing).	This site is on the phishing blocklist.
+malware	Trang này nằm trong danh sách phát tán mã độc.	This site is on the malware blocklist.
+doh	DNS qua HTTPS (DoH) không được phép vì nó vượt qua bộ lọc của tổ chức.	DNS over HTTPS (DoH) is not allowed because it bypasses filtering.
+ip-literal	Không được truy cập bằng địa chỉ IP. Hãy dùng tên miền.	Access by IP address is not allowed. Use a host name.
+gambling	Nội dung cờ bạc không được phép.	Gambling content is not allowed.
+social	Mạng xã hội không được phép trên mạng khách.	Social networks are not allowed on the guest network.
+games	Trò chơi trực tuyến không được phép trên mạng khách.	Online games are not allowed on the guest network.
+streaming	Dịch vụ xem video trực tuyến không được phép trên mạng khách.	Video streaming is not allowed on the guest network.
+worktime	Nội dung giải trí bị chặn trong giờ làm việc (thứ Hai đến thứ Sáu, 08:00 đến 17:00).	Leisure content is blocked during work hours (Monday to Friday, 08:00 to 17:00).
+path	Đường dẫn này bị chặn theo chính sách.	This URL path is blocked by policy.
+filetype	Loại file này không được phép tải xuống.	This file type may not be downloaded.
+filetype-mime	Nội dung trả về là loại file không được phép tải xuống.	The response is a file type that may not be downloaded.

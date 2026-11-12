@@ -18,6 +18,8 @@ COPY conf/squid.conf /etc/squid/squid.conf
 COPY conf/conf.d/ /etc/squid/conf.d/
 COPY templates/ /etc/squid/templates/
 COPY errors/ /etc/squid/errors-lab/
+# Custom error_directory must contain the stock templates too (spec §5.6).
+RUN bash /etc/squid/errors-lab/build-errors.sh /etc/squid/errors-lab /usr/share/squid/errors/nt140
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY prepare-tls.sh /usr/local/lib/nt140/prepare-tls.sh
 COPY switch-tls.sh /usr/local/lib/nt140/switch-tls.sh

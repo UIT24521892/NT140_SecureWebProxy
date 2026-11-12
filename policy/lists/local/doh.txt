@@ -1,0 +1,6 @@
+dns.lab.test
+.cloudflare-dns.com
+dns.google
+.dns.quad9.net
+doh.opendns.com
+.dns.nextdns.io

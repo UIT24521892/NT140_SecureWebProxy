@@ -1,0 +1,13 @@
+# ICAP client: send responses to c-icap/ClamAV (spec §7). Owner: THR-4.
+# Rendered by the entrypoint and by scripts/set-icap.sh.
+icap_enable on
+adaptation_send_client_ip on
+adaptation_send_username on
+icap_client_username_header X-Authenticated-User
+# Fail fast when the ICAP server is gone: a stopped container drops packets, so the
+# default connect timeout would hang the client for longer than its own timeout.
+icap_connect_timeout 2 seconds
+# bypass=0: fail-closed (default). bypass=1: fail-open when the service is down.
+icap_service svc_av respmod_precache icap://icap:1344/virus_scan bypass=${ICAP_BYPASS_FLAG}
+# ICAP_ENABLED=0 renders `deny` so benchmarks can measure without scanning (spec §13.1).
+adaptation_access svc_av ${ICAP_ACCESS} all

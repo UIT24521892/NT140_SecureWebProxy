@@ -5,49 +5,51 @@
 > - **Ghi đè** trạng thái hiện tại, không viết nhật ký. Lịch sử xem bằng `git log`.
 > - Mỗi track chỉ sửa section của mình. Section “Chung” do TV1 cập nhật.
 
-**Milestone hiện tại:** đang hoàn thiện M1 (khung chạy được). Đã kiểm tay, còn thiếu test tự động phần khung; kiểm tra S0 đầy đủ sau khi triển khai antivirus, trước M2.
-**Cập nhật lần cuối:** 2026-10-28, Codex (làm rõ phân công/lộ trình trong plan; testweb thuộc TV2; kết quả chạy giữ theo lần kiểm 2026-10-22)
+**Milestone hiện tại:** M1 đạt trên arm64; M2 (chức năng chính) đạt trên arm64 trừ T1.5 đang chờ quyết định. **Chưa có lần chạy amd64 nào cho bản ghép này.**
+**Cập nhật lần cuối:** 2026-11-11, Claude trên máy TV1 (arm64): ghép PR #3 + POL-1, làm THR-2, THR-4, POL-2..6.
 
 ## Chung
-- Môi trường: TV1 dùng Docker Desktop trên Mac M2 (arm64). Kali/UTM chỉ dùng làm máy demo (plan §3).
-- `make init && make up` chạy được. 4 service healthy: squid, testweb, client-staff, client-guest.
-- Đã kiểm tay trên arm64 (2026-10-22):
-  - staff/guest → proxy → `http://allowed.lab.test/`: 200 kèm `LAB-ORIGIN`;
-  - HTTPS CONNECT: 200, issuer = Lab Public Root CA;
-  - đi thẳng không qua proxy: curl exit 6/7, client không có default route;
-  - `access.log` có các dòng TCP_MISS/200 và TCP_TUNNEL/200.
-- Đã chạy test trên: arm64 ✅ (thủ công), amd64 ❌ (chưa)
-- Profile chưa bật: `av` (icap, clamav, THR-4), `dashboard` (goaccess), `capture` (sniffer), `p2` (tcpecho).
+- Môi trường: TV1 dùng Docker Desktop trên Mac M2 (arm64). Hướng dẫn chạy ở `README.md`; phần Windows/Linux chưa ai xác nhận.
+- `main` có INF-1..3, THR-3, và PR #3 (TLS-1/2/3/4/5/6/7/9, DOC-2). PR #1 (POL-1) còn mở.
+- **Nhánh làm việc `wip/m2-integration` (tách từ `main`, toàn bộ CHƯA COMMIT):** POL-1 (áp từ nhánh PR #1) + sửa dryrun + THR-2 + THR-4 + POL-2..6. Cần tách commit/PR theo task trước khi merge.
+- `make up`: 6 service chạy (squid, icap, clamav, testweb `healthy`; 2 client `Up`). Profile chưa bật: `dashboard`, `capture`, `p2`.
+- `make test` (arm64, 11/11): **74 case: 63 PASS, 10 PASS (limitation), 1 FAIL (T1.5), 0 SKIP**. Có module S0, S1, S2, S5, S6, S7, S8, S9, S10. Chưa có S3, S4, S11.
+- Câu hỏi mở (`docs/open-questions.md`): #1 fail-open làm bẩn cache; #2 T1.5 guest HTTPS bị chặn ra `TLS_ERROR`.
+- `squid -k parse`: không ERROR/FATAL; 1 WARNING `empty ACL threat_ips` khi feed rỗng (đã giải thích ở verify-log).
 
 ## Track INF/POL (TV1, arm64)
-- Xong: INF-1, INF-2, INF-3 (Squid 6.14 `squid-openssl`, render template, `-k parse` lúc start, healthcheck `squid -k check`).
-- `40-access.conf` đang ở dạng khung (cho phép cả 2 LAN), chưa có auth.
-- Bước tiếp: POL-1 (auth) → POL-2 (list + ACL) → POL-3 (`http_access` §5.4, trang chặn) → POL-4.
-- Blocker: —
+- Xong trên `main`: INF-1, INF-2, INF-3.
+- Xong trên nhánh làm việc, chưa commit, đã kiểm arm64:
+  - POL-1: auth + nhóm (T1.8, T2.1, T2.2 PASS).
+  - POL-2: `policy/lists/local/*.txt`, `conf.d/11-acl-lists.conf`, `13-acl-misc.conf` (đúng tên ACL spec §5.2).
+  - POL-3: `40-access.conf` đúng thứ tự §5.4 (có `!dryrun` trước 2 rule `dst`), `41-reply-access.conf`, `70-errors.conf`, trang chặn sinh từ `errors/ERR_LAB.tmpl` + `reasons.tsv`.
+  - POL-4: `scripts/set-worktime.sh`, `make worktime` (T2.4–T2.8 PASS).
+  - POL-5: `50-cache.conf`, `templates/delay.conf.tmpl` (S10 4/4 PASS).
+  - POL-6: `s01`, `s02`, `s06`, `s10`. S2 10/10, S6 8/8, S10 4/4, S1 7/8.
+- Sửa dryrun: request `X-Lab-Dryrun` không còn gây tra DNS (verify-log 11/11); `conf.d/14-dryrun.conf` thuộc THR-5, tạo sớm.
+- Bước tiếp: quyết T1.5 (open-questions #2); DOC-1; nghiệm thu amd64; review/merge.
+- Blocker: cần người chạy amd64 và review theo plan §4.
 
 ## Track TLS (TV2, amd64)
-- Cập nhật 2026-11-07, Codex/TV2, amd64. Đã triển khai mã TLS-1/2/3/4/5/6/7/9, DOC-2; TLS-8 chưa làm (P2).
-- PKI/probe: 9 test đạt (sinh/giữ/xoay CA, phát hiện key lệch, 6 outcome bằng curl thật); testweb: 5 test đạt, đủ alias/path/MIME/archive.
-- Ba mode đổi bằng `scripts/set-tls-mode.sh`, SSL DB/CA được chuẩn bị, parse sạch; staff bump, guest/nobump splice, SNI terminate, pinning/unmanaged đúng.
-- S7/S8/S9: 18/25 đạt; 7 FAIL giữ nguyên expect: T7.1/2, T8.2/7, T9.4/6/7 (thiếu POL-3/5). Xem `results/tls/20261107-203319-616b2e/`.
-- Case hỗ trợ: T6.7 đạt; T1.5/T6.8 chưa đạt do POL-3. Xem `results/tls/20261107-205119-786d79/`.
-- Capture: 4 pcap của 3 loại HTTP/splice/bump (một bump TLS1.2 chẩn đoán); tshark giải mã GET client TLS1.3 và upstream TLS1.2. Chưa có ICAP/ảnh Wireshark.
-- Benchmark: 500 request (50/payload), B1/B2/B5/B6/B7 đạt; B3 SKIP (POL-5), B4/B8 SKIP (THR-4). `results/bench/20261107-204741-89a07c/` có CSV/MD/CPU-RAM.
-- Kiểm tra: build/up trên amd64, Compose config, ShellCheck, py_compile, test thật; `make test P=P0` chưa chạy được vì THR-2 chưa có runner.
-- Bàn giao: `docs/trung-handoff.md`, `tls-limitations.md`, `wireshark.md`. Dùng log TLS + cổng client để nối dòng CONNECT cuối bị mất header test ID.
-- Bàn giao 2026-11-09: [x] nhánh riêng; [x] clone sạch amd64 tại `cbc7cb1f7dc75a5837b5838a87bc95f79c605f52`; [x] [PR #3](https://github.com/UIT24521892/NT140_SecureWebProxy/pull/3). ZIP gửi riêng được chốt theo PR-head SHA, có README-evidence/SHA256SUMS/checksum ZIP.
-- Clone sạch 09/11: init/build/up + 3 mode parse + restart/probe đạt; PKI/probe 9/9, testweb 5/5; S7–S9 vẫn 18/25, SUPPORT 1/3; benchmark 500 mẫu, B3/B4/B8 vẫn SKIP. Runner phục hồi mode/giờ và giữ nguyên .env; parser THR-3 16 trường đạt. Output: `results/handoff/20261109/`; không suy ra auth đã đạt khi POL-1 chưa ghép.
-- Còn chờ: POL-2/3/5 + THR-2/4, chạy arm64, ảnh ICAP/Wireshark, review DOC-2. Lab đã phục hồi selective/giờ ban đầu, tắt TLS key log tạm.
+- Đã merge PR #3: TLS-1/2/3/4/5/6/7/9, DOC-2. TLS-8 (stretch) chưa làm.
+- Gác cổng arm64 (Claude, 11/11): unit test `tests/tls` 9 OK; 3 mode đổi được; `scripts/test_tls.py` 18/25 giống amd64. Sau khi ghép POL: S7 8/8, S8 9/9, S9 8/8 qua runner chung.
+- Việc còn lại đề xuất cho TV2: bỏ `scripts/test_tls.py`, `tls_support.py`, target `test-tls` (trùng với `tests/run_all.py`); xem lại `docs/trung-handoff.md` (ngoài spec §16, nội dung đã cũ); `/` của testweb đang có `Cache-Control: public` (spec §8 không yêu cầu); chạy `make bench` đủ B1–B8 khi cache và ICAP đã có.
+- Blocker: —
 
 ## Track THR (TV3, amd64)
-- Testweb do TV2 phụ trách (TLS-9); TV3 kiểm tra dữ liệu thử phục vụ antivirus/phishing và viết test THR.
-- Việc của TV3:
-  - THR-3 (đang review, nhánh `thr/THR-3-logformat`): logformat `lab` 16 trường TAB → `access_lab.log`; parser `tests/lib/squidlog.py` (`find_by_test_id`, `evidence`, `--check`). Đã kiểm: 16 trường, `py_compile`, parser trên log mẫu. **Chưa** chạy `squid -k parse` / log thật (cần amd64 + arm64). Chưa verify `%adapt::sum_trs`.
-  - THR-2: `tests/run_all.py` + `s00_smoke.py`.
-  - THR-4: bỏ profile `av`, viết `docker/icap`. Image ClamAV là `clamav/clamav-debian:1.4`.
-- Blocker: —
+- THR-3: merge ở PR #2 (tự merge, chưa review). TV1 review 12/11 yêu cầu sửa parser; đang sửa ở nhánh `thr/THR-3-parser-fix`:
+  - `test_id` gộp `T.X,%20T.X` (HTTP gửi cả `-H` và `--proxy-header`) → chuẩn hóa về `T.X`.
+  - `mark()` + tham số `since` (`records_for`, `find_by_test_id`, `connection_records`, `all_records`, `best_record`, CLI `--since`) để không lấy dòng log của lần chạy trước.
+  - Unit test `python3 tests/lib/test_squidlog.py`: 12 OK (bản cũ: 4 FAIL, 6 ERROR). Chưa chạy lab amd64.
+  - Còn phải kiểm trên amd64: quyền đọc log (umask, review mục 5), lệnh nghiệm thu của TV1.
+- THR-2, THR-4: đã merge (PR #5, #6). Runner chưa dùng `since` (đã có run id riêng mỗi lần chạy); dùng khi làm T11.1 (THR-6).
+- Chưa làm: THR-5 (feed, S3), THR-6 (S4, S11), THR-7 (log summary, goaccess), THR-8, DOC-3.
+- Câu hỏi mở: #3 nguồn dữ liệu đếm virus cho §10.2.
+- Blocker: chưa chạy được lab trên máy amd64 (WSL đang là WSL 1).
 
 ## Kết quả test gần nhất
 | Ngày | Arch | Lệnh | Kết quả |
 |---|---|---|---|
-| 2026-10-22 | arm64 | `make up`; curl qua proxy (HTTP/HTTPS); curl direct; `squid -k parse/check/reconfigure`; `make lint` | Tất cả đạt (kiểm tay, chưa có runner) |
+| 2026-11-11 | arm64 | `make init`; `make up`; `make test`; `make test P=P0`; `squid -k parse`; `make lint` | 74 case: 63 PASS, 10 PASS (limitation), 1 FAIL (T1.5), 0 SKIP. Lint đạt (16 `.sh`, 24 `.py`) |
+| 2026-11-09 | amd64 | PR #3 trên clone sạch (TV2/Codex) | `scripts/test_tls.py` 18/25 trước khi có POL |
+| 2026-11-09 | arm64 | POL-1: auth HTTP/HTTPS, log THR-3, cô lập mạng | 31/31 kiểm tra độc lập đạt |
