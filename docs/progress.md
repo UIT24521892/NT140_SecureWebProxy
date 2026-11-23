@@ -37,11 +37,15 @@
 - Blocker: —
 
 ## Track THR (TV3, amd64)
-- Xong trên `main`: THR-3. Parser thêm `connection_records`/`best_record` (ghép dòng CONNECT qua `access_tls.log`), chưa commit.
-- THR-2 (chưa commit): `tests/run_all.py`, `tests/lib/{model,lab,report}.py`, `s00_smoke.py`. Đủ 6 kind; thiếu điều kiện thì SKIP kèm lý do; test id trong log là `<runid>.<case id>`. `sni_probe` đã chạy thật (T7.6 PASS).
-- THR-4 (chưa commit): `docker/icap/`, `templates/icap.conf.tmpl`, `scripts/set-icap.sh`, `s05_antivirus.py`. S5 13/13 (8 PASS + 5 limitation) trên arm64. Khác spec ban đầu, đã sửa spec §7/§15: unix socket qua volume `clamd-sock`, `adaptation_send_*`, `icap_connect_timeout 2 seconds`, biến `ICAP_ACCESS`.
+- THR-3: merge ở PR #2 (tự merge, chưa review). TV1 review 12/11 yêu cầu sửa parser; đang sửa ở nhánh `thr/THR-3-parser-fix`:
+  - `test_id` gộp `T.X,%20T.X` (HTTP gửi cả `-H` và `--proxy-header`) → chuẩn hóa về `T.X`.
+  - `mark()` + tham số `since` (`records_for`, `find_by_test_id`, `connection_records`, `all_records`, `best_record`, CLI `--since`) để không lấy dòng log của lần chạy trước.
+  - Unit test `python3 tests/lib/test_squidlog.py`: 12 OK (bản cũ: 4 FAIL, 6 ERROR). Chưa chạy lab amd64.
+  - Còn phải kiểm trên amd64: quyền đọc log (umask, review mục 5), lệnh nghiệm thu của TV1.
+- THR-2, THR-4: đã merge (PR #5, #6). Runner chưa dùng `since` (đã có run id riêng mỗi lần chạy); dùng khi làm T11.1 (THR-6).
 - Chưa làm: THR-5 (feed, S3), THR-6 (S4, S11), THR-7 (log summary, goaccess), THR-8, DOC-3.
-- Blocker: —
+- Câu hỏi mở: #3 nguồn dữ liệu đếm virus cho §10.2.
+- Blocker: chưa chạy được lab trên máy amd64 (WSL đang là WSL 1).
 
 ## Kết quả test gần nhất
 | Ngày | Arch | Lệnh | Kết quả |
