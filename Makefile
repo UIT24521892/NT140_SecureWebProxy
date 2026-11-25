@@ -59,7 +59,7 @@ bench: ## Run benchmark B1-B8
 	$(PYTHON) scripts/bench.py $(if $(N),--requests $(N))
 
 summary: ## Summarise squid logs into results/
-	$(call todo,THR-7)
+	$(PYTHON) scripts/log_summary.py
 
 eval-fp: ## Evaluate blocklist false positives against Tranco
 	$(call todo,THR-8)
